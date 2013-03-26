@@ -7,17 +7,17 @@ requires jQuery 1.7+
 
 
 (function (factory) {
-    if (typeof define === 'function' && define.amd) {
-        // AMD. Register as an anonymous module.
-        define(['jquery'], factory);
-    } else {
-        // Browser globals
-        factory(jQuery);
-    }
+	if (typeof define === 'function' && define.amd) {
+		// AMD. Register as an anonymous module.
+		define(['jquery'], factory);
+	} else {
+		// Browser globals
+		factory(jQuery);
+	}
 }(function ($) {
 	var _baseDate = _generateBaseDate();
 	var _ONE_DAY = 86400;
-	var _defaults =	{
+	var _defaults = {
 		className: null,
 		minTime: null,
 		maxTime: null,
@@ -27,7 +27,6 @@ requires jQuery 1.7+
 		timeFormat: 'g:ia',
 		scrollDefaultNow: false,
 		scrollDefaultTime: false,
-		selectOnBlur: false,
 		disableTouchKeyboard: true,
 		forceRoundTime: false,
 		appendTo: 'body',
@@ -87,8 +86,11 @@ requires jQuery 1.7+
 				self.data('timepicker-settings', settings);
 				self.prop('autocomplete', 'off');
 				self.on('click.timepicker focus.timepicker', methods.show);
-				self.on('blur.timepicker', _formatValue);
-				self.on('keydown.timepicker', _keyhandler);
+				self.on('blur.timepicker', function() {
+					_selectValue(self);
+					_formatValue.apply(this, arguments);
+				});
+				self.on('keydown', _keyhandler);
 				self.addClass('ui-timepicker-input');
 
 				_formatValue.call(self.get(0));
@@ -134,6 +136,8 @@ requires jQuery 1.7+
 
 			list.show();
 
+			_setSelected(self, list);
+
 			if ((self.offset().top + self.outerHeight(true) + list.outerHeight()) > $(window).height() + $(window).scrollTop()) {
 				// position the dropdown on top
 				list.offset({ 'left':(self.offset().left), 'top': self.offset().top - list.outerHeight() });
@@ -146,13 +150,13 @@ requires jQuery 1.7+
 			var selected = list.find('.ui-timepicker-selected');
 
 			if (!selected.length) {
-                if (self.val()) {
-                    selected = _findRow(self, list, _time2int(self.val()));
-                } else if (settings.scrollDefaultNow) {
-                    selected = _findRow(self, list, _time2int(new Date()));
-                } else if (settings.scrollDefaultTime !== false) {
-                    selected = _findRow(self, list, _time2int(settings.scrollDefaultTime));
-                }
+				if (self.val()) {
+					selected = _findClosestRow(self, list, _time2int(self.val()));
+				} else if (settings.scrollDefaultNow) {
+					selected = _findClosestRow(self, list, _time2int(new Date()));
+				} else if (settings.scrollDefaultTime !== false) {
+					selected = _findClosestRow(self, list, _time2int(settings.scrollDefaultTime));
+				}
 			}
 
 			if (selected && selected.length) {
@@ -173,11 +177,6 @@ requires jQuery 1.7+
 				var list = $(this);
 				var self = list.data('timepicker-input');
 				var settings = self.data('timepicker-settings');
-
-				if (settings && settings.selectOnBlur) {
-					_selectValue(self);
-				}
-
 				list.hide();
 				self.trigger('hideTimepicker');
 			});
@@ -322,7 +321,6 @@ requires jQuery 1.7+
 			appendTo = appendTo(self);
 		}
 		appendTo.append(list);
-		_setSelected(self, list);
 
 		list.on('click', 'li', function(e) {
 			self.addClass('ui-timepicker-hideme');
@@ -366,7 +364,7 @@ requires jQuery 1.7+
 		}
 	}
 
-	function _findRow(self, list, value)
+	function _findClosestRow(self, list, value)
 	{
 		if (!value && value !== 0) {
 			return false;
@@ -392,17 +390,36 @@ requires jQuery 1.7+
 		return out;
 	}
 
+	function _findRow(self, list, value)
+	{
+		if (!value && value !== 0) {
+			return false;
+		}
+
+		var out = false;
+
+		list.find('li').each(function(i, obj) {
+			var jObj = $(obj);
+			if (jObj.data('time') == value) {
+				out = jObj;
+				return false;
+			}
+		});
+
+		return out;
+	}
+
 	function _setSelected(self, list)
 	{
+		list.find('.ui-timepicker-selected').removeClass('ui-timepicker-selected');
 		var timeValue = _time2int(self.val());
-
 		var selected = _findRow(self, list, timeValue);
 		if (selected) selected.addClass('ui-timepicker-selected');
 	}
 
 
 	function _formatValue()
-	{
+	{    
 		if (this.value === '') {
 			return;
 		}
@@ -448,8 +465,6 @@ requires jQuery 1.7+
 		if (!list || !list.is(':visible')) {
 			if (e.keyCode == 40) {
 				self.focus();
-			} else {
-				return true;
 			}
 		}
 
@@ -513,6 +528,7 @@ requires jQuery 1.7+
 				break;
 
 			case 9: //tab
+				_selectValue(self);
 				methods.hide();
 				break;
 
